@@ -1,0 +1,2 @@
+# aiagenttrading
+ai selftrader
