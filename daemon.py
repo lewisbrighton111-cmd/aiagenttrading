@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
 SNIPER Daemon — Schedule-based runner for trading briefings.
-All times are UTC.  Adjust the constants below to shift your schedule.
+All times are UTC.
 
-Default schedule (UTC → CET → ET):
-  Pre-market:  12:30 UTC  =  1:30 PM CET  =  8:30 AM ET
-  Intraday:    16:00 UTC  =  5:00 PM CET  = 12:00 PM ET
-  EOD:         20:15 UTC  =  9:15 PM CET  =  4:15 PM ET
-  Weekend:     13:00 UTC Saturday  =  2:00 PM CET  =  9:00 AM ET
+Enhanced schedule (UTC → CET):
+  06:00 UTC =  7:00 AM CET  — Early morning scan (pre-Asia close)
+  08:00 UTC =  9:00 AM CET  — European open briefing
+  10:00 UTC = 11:00 AM CET  — Mid-morning update
+  12:30 UTC =  1:30 PM CET  — Pre-US session briefing
+  14:30 UTC =  3:30 PM CET  — US open update
+  16:00 UTC =  5:00 PM CET  — Afternoon check
+  18:00 UTC =  7:00 PM CET  — Late session update
+  20:15 UTC =  9:15 PM CET  — EOD review
+  22:00 UTC = 11:00 PM CET  — Overnight risk scan
+  Weekend:  Saturday 13:00 UTC = 2:00 PM CET — Deep dive
 """
 
 import schedule
@@ -32,7 +38,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Health endpoint (for UptimeRobot or similar)
+# Health endpoint
 # ---------------------------------------------------------------------------
 health_app = Flask(__name__)
 
@@ -52,7 +58,7 @@ def start_health_server():
 # Agent runner
 # ---------------------------------------------------------------------------
 PYTHON = "/opt/trading-bot/venv/bin/python"
-AGENT  = "/opt/trading-bot/agent.py"
+AGENT = "/opt/trading-bot/agent.py"
 
 def run_agent(command: str):
     """Run agent.py with the specified command."""
@@ -60,9 +66,7 @@ def run_agent(command: str):
     try:
         result = subprocess.run(
             [PYTHON, AGENT, command],
-            capture_output=True,
-            text=True,
-            timeout=600,          # 10 min hard timeout (deep dive can be slow)
+            capture_output=True, text=True, timeout=600,
         )
         if result.returncode != 0:
             logger.error(f"agent.py {command} FAILED:\n{result.stderr}")
@@ -74,12 +78,23 @@ def run_agent(command: str):
         logger.error(f"Error running {command}: {e}")
 
 # ---------------------------------------------------------------------------
-# Schedule — weekday briefings (Mon-Fri)
+# Schedule — Weekday briefings (Mon-Fri)
 # ---------------------------------------------------------------------------
+# Full briefings (sonar-pro) — detailed analysis
+FULL_BRIEFING_TIMES = ["06:00", "08:00", "12:30", "20:15"]
+
+# Quick updates (sonar) — fast mid-session checks
+QUICK_UPDATE_TIMES = ["10:00", "14:30", "16:00", "18:00", "22:00"]
+
 for day in ["monday", "tuesday", "wednesday", "thursday", "friday"]:
-    getattr(schedule.every(), day).at("12:30").do(run_agent, "pre-market")
-    getattr(schedule.every(), day).at("16:00").do(run_agent, "intraday")
-    getattr(schedule.every(), day).at("20:15").do(run_agent, "eod")
+    for t in FULL_BRIEFING_TIMES:
+        if t == "20:15":
+            getattr(schedule.every(), day).at(t).do(run_agent, "eod")
+        else:
+            getattr(schedule.every(), day).at(t).do(run_agent, "pre-market")
+
+    for t in QUICK_UPDATE_TIMES:
+        getattr(schedule.every(), day).at(t).do(run_agent, "intraday")
 
 # Weekend deep dive — Saturday
 schedule.every().saturday.at("13:00").do(run_agent, "weekend")
@@ -88,11 +103,11 @@ schedule.every().saturday.at("13:00").do(run_agent, "weekend")
 # Main loop
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    # Start health server in background thread
     threading.Thread(target=start_health_server, daemon=True).start()
     logger.info("Health server started on :8080")
 
-    logger.info("SNIPER daemon started. Waiting for scheduled tasks…")
+    logger.info("SNIPER daemon started. Enhanced schedule active.")
+    logger.info(f"Weekday: {len(FULL_BRIEFING_TIMES)} full briefings + {len(QUICK_UPDATE_TIMES)} quick updates = {len(FULL_BRIEFING_TIMES) + len(QUICK_UPDATE_TIMES)} per day")
     logger.info(f"Next run: {schedule.next_run()}")
 
     while True:

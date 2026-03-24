@@ -25,6 +25,7 @@ import logging
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
+from positions import format_positions_for_prompt
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -199,7 +200,11 @@ def send_telegram(message: str) -> bool:
 def pre_market_briefing():
     """Pre-market briefing: regime, levels, catalysts, trade ideas."""
     logger.info("Running PRE-MARKET briefing…")
+    pos_context = format_positions_for_prompt()
     prompt = f"""Deliver a comprehensive pre-market intelligence briefing for today.
+
+{pos_context}
+Analyze how current positions are affected by overnight developments. For each open position, provide specific stop/target adjustment recommendations.
 
 Instruments tracked:
 {instrument_block()}
@@ -267,7 +272,11 @@ Structure your response EXACTLY as follows:
 def intraday_update():
     """Midday update: developments, level checks, flow."""
     logger.info("Running INTRADAY update…")
+    pos_context = format_positions_for_prompt()
     prompt = f"""Provide a concise intraday trading update across all asset classes.
+
+{pos_context}
+For each open position, assess whether it should be held, scaled, or closed based on current price action.
 
 Instruments tracked:
 {instrument_block()}
@@ -316,7 +325,11 @@ Keep it punchy — this is a quick mid-session check, not a full briefing."""
 def eod_review():
     """End-of-day review: scorecard, thesis check, overnight risk."""
     logger.info("Running EOD review…")
+    pos_context = format_positions_for_prompt()
     prompt = f"""Deliver an end-of-day trading review across all asset classes.
+
+{pos_context}
+For each open position, provide an updated risk assessment, recommended stop adjustments, and whether to hold overnight.
 
 Instruments tracked:
 {instrument_block()}
@@ -376,7 +389,11 @@ Structure:
 def weekend_deep_dive():
     """Weekly deep dive: regime assessment, scoring, swing ideas."""
     logger.info("Running WEEKEND deep dive…")
+    pos_context = format_positions_for_prompt()
     prompt = f"""Conduct a comprehensive weekly trading analysis across all asset classes.
+
+{pos_context}
+For each open position, provide a weekly outlook and whether the trade thesis is still valid for the coming week.
 
 Instruments tracked:
 {instrument_block()}
