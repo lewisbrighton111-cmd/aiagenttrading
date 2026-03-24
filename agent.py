@@ -88,11 +88,14 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = (
     "You are SNIPER, a senior multi-asset trading analyst. "
     "You cover forex, crypto, stock indices, commodities, and metals. "
+    "CRITICAL: You MUST search for and provide current real-time prices for EVERY instrument mentioned. "
+    "Search financial sites like TradingView, Investing.com, MarketWatch, Yahoo Finance, Bloomberg, "
+    "CoinGecko, CoinMarketCap, ForexFactory, and Reuters for live price data. "
+    "For EVERY instrument, provide the actual current price, daily change, and percentage change. "
     "Be precise with numbers — always cite price levels, percentages, and times. "
     "Use clean formatting with headers and bullet points. "
-    "Every trade idea MUST include entry, stop-loss, take-profit, and risk-reward ratio. "
-    "Never hedge excessively — give clear directional views with conviction levels. "
-    "If data is unavailable for an instrument, say so instead of guessing."
+    "Every trade idea MUST include a specific entry price, stop-loss, take-profit, and risk-reward ratio. "
+    "Give clear directional views with conviction levels. Never say data is unavailable — search harder."
 )
 
 # ---------------------------------------------------------------------------
@@ -113,6 +116,12 @@ def call_perplexity(prompt: str, model: str, recency_filter: str = "day") -> str
         "temperature": 0.3,
         "max_tokens": 8192,
         "search_recency_filter": recency_filter,
+        "search_domain_filter": [
+            "tradingview.com", "investing.com", "marketwatch.com",
+            "finance.yahoo.com", "bloomberg.com", "reuters.com",
+            "coinmarketcap.com", "coingecko.com", "forexfactory.com",
+            "cnbc.com", "wsj.com", "fxstreet.com",
+        ],
     }
 
     for attempt in range(3):
@@ -201,42 +210,49 @@ def pre_market_briefing():
     """Pre-market briefing: regime, levels, catalysts, trade ideas."""
     logger.info("Running PRE-MARKET briefing…")
     pos_context = format_positions_for_prompt()
-    prompt = f"""Deliver a comprehensive pre-market intelligence briefing for today.
+    prompt = f"""Search for CURRENT LIVE PRICES for all instruments listed below and deliver a pre-market intelligence briefing.
 
 {pos_context}
 Analyze how current positions are affected by overnight developments. For each open position, provide specific stop/target adjustment recommendations.
 
-Instruments tracked:
-{instrument_block()}
+You MUST search for and report the exact current price for EACH of these instruments:
+
+FOREX: {', '.join(FOREX)} — search "EUR/USD price today", "USD/JPY live rate", etc.
+CRYPTO: {', '.join(CRYPTO)} — search "Bitcoin price", "Ethereum price today", etc.
+INDICES: {', '.join(INDICES)} — search "S&P 500 futures", "DAX 40 live", "Nasdaq futures today", etc.
+COMMODITIES: {', '.join(COMMODITIES)} — search "crude oil price today", "WTI oil price", etc.
+METALS: {', '.join(METALS)} — search "gold price today", "silver price per ounce", etc.
+
+Also search for: "DXY dollar index today", "VIX index today", "economic calendar today"
 
 Structure your response EXACTLY as follows:
 
 1. MARKET REGIME OVERVIEW
    - Global macro regime: risk-on / risk-off / mixed
    - Key overnight developments (Asia, Europe sessions)
-   - US Dollar Index (DXY) direction and driver
+   - US Dollar Index (DXY): exact current level, daily change %
 
 2. FOREX OUTLOOK
    For each pair ({', '.join(FOREX)}):
-   - Current price, overnight change %
+   - EXACT current price and daily change %
    - Key support and resistance levels
    - Directional bias and catalyst
 
 3. CRYPTO OUTLOOK
    For each ({', '.join(CRYPTO)}):
-   - Current price, 24h change %
+   - EXACT current price and 24h change %
    - Key levels, on-chain signals if notable
    - Directional bias
 
 4. INDICES OUTLOOK
    For each ({', '.join(INDICES)}):
-   - Futures price / pre-market indication
+   - EXACT current futures price / pre-market level and daily change %
    - Key levels
    - Sector leadership and notable movers
 
 5. COMMODITIES & METALS
    For each ({', '.join(COMMODITIES + METALS)}):
-   - Current price, daily change %
+   - EXACT current price and daily change %
    - Supply/demand drivers, inventory data
    - Key levels
 
@@ -249,7 +265,7 @@ Structure your response EXACTLY as follows:
 7. TOP TRADE IDEAS (5-8 ideas across all asset classes)
    For EACH idea:
    - Asset and direction (Long/Short)
-   - Entry price and trigger condition
+   - SPECIFIC entry price based on current market price
    - Stop-loss level and reasoning
    - Take-profit target(s)
    - Risk:Reward ratio
@@ -257,9 +273,11 @@ Structure your response EXACTLY as follows:
    - Timeframe: Intraday / Swing
 
 8. RISK DASHBOARD
-   - VIX level and trend
+   - VIX: exact current level and trend
    - Key correlations to watch today
-   - Tail risk events"""
+   - Tail risk events
+
+Do NOT say prices are unavailable. You MUST search and find them."""
 
     result = call_perplexity(prompt, MODEL_BRIEFING, "day")
     header = (
@@ -273,46 +291,49 @@ def intraday_update():
     """Midday update: developments, level checks, flow."""
     logger.info("Running INTRADAY update…")
     pos_context = format_positions_for_prompt()
-    prompt = f"""Provide a concise intraday trading update across all asset classes.
+    prompt = f"""Search for the CURRENT LIVE PRICES right now for all of these instruments and provide an intraday trading update.
 
 {pos_context}
 For each open position, assess whether it should be held, scaled, or closed based on current price action.
 
-Instruments tracked:
-{instrument_block()}
+You MUST look up and report the current price for EACH of these:
 
-Cover:
+FOREX: {', '.join(FOREX)} — search "EUR/USD price today", "GBP/USD live rate", etc.
+CRYPTO: {', '.join(CRYPTO)} — search "Bitcoin price", "ETH price today", etc.
+INDICES: {', '.join(INDICES)} — search "S&P 500 today", "DAX 40 live", etc.
+COMMODITIES: {', '.join(COMMODITIES)} — search "crude oil price today", "natural gas price", etc.
+METALS: {', '.join(METALS)} — search "gold price today", "silver price live", etc.
 
-1. SESSION SUMMARY SO FAR
-   - What moved the most since the open? Biggest winners and losers.
-   - Any surprise data releases or headlines?
+For EVERY instrument, you MUST provide: current price, daily change, and % change.
 
-2. LEVEL CHECK
-   - For major movers: are pre-market support/resistance levels holding?
-   - Notable breakouts, breakdowns, or rejections
+Then cover:
 
-3. FOREX UPDATE
-   - DXY move today, major pair updates (focus on pairs that moved >0.3%)
+1. MARKET SNAPSHOT
+   - Biggest movers up and down across all asset classes with exact prices and % changes
 
-4. CRYPTO UPDATE
-   - BTC and ETH price action, dominance shift, notable altcoin moves
+2. FOREX UPDATE
+   - DXY current level and direction
+   - Each pair: current bid price, daily change %, key level proximity
 
-5. INDICES & EQUITIES
-   - Index performance, sector rotation, notable single-stock moves
+3. CRYPTO UPDATE
+   - BTC and ETH: exact price, 24h change %, key levels
+   - SOL, XRP: price and notable moves
 
-6. COMMODITIES & METALS
-   - Oil, gold, and any commodity making a significant move
+4. INDICES
+   - Each index: current level, daily change %, intraday trend
 
-7. FLOW & SENTIMENT
-   - Unusual options activity, large block trades
-   - Crypto whale movements or exchange flow if notable
-   - Put/call ratio changes
+5. COMMODITIES & METALS
+   - Each: current price, daily change %
+   - Any supply/demand news driving moves
 
-8. TRADE IDEA ADJUSTMENTS
-   - Should any morning ideas be modified, stopped out, or scaled?
-   - Any NEW intraday setups emerging?
+6. KEY DEVELOPMENTS
+   - News, data releases, or events moving markets right now
 
-Keep it punchy — this is a quick mid-session check, not a full briefing."""
+7. TRADE IDEAS
+   - 2-3 actionable setups based on current price action
+   - Each with: entry price, stop-loss, take-profit, R:R ratio
+
+Do NOT say prices are unavailable. Search for them."""
 
     result = call_perplexity(prompt, MODEL_QUICK, "hour")
     header = (
@@ -326,57 +347,58 @@ def eod_review():
     """End-of-day review: scorecard, thesis check, overnight risk."""
     logger.info("Running EOD review…")
     pos_context = format_positions_for_prompt()
-    prompt = f"""Deliver an end-of-day trading review across all asset classes.
+    prompt = f"""Search for TODAY'S CLOSING PRICES and daily performance for all instruments below and deliver an end-of-day review.
 
 {pos_context}
 For each open position, provide an updated risk assessment, recommended stop adjustments, and whether to hold overnight.
 
-Instruments tracked:
-{instrument_block()}
+You MUST search for and report today's actual closing/current price for EACH of these:
+
+FOREX: {', '.join(FOREX)} — search "EUR/USD closing price today", "USD/JPY price today", etc.
+CRYPTO: {', '.join(CRYPTO)} — search "Bitcoin price", "ETH price today", etc.
+INDICES: {', '.join(INDICES)} — search "S&P 500 close today", "DAX close today", etc.
+COMMODITIES: {', '.join(COMMODITIES)} — search "crude oil closing price", "WTI price today", etc.
+METALS: {', '.join(METALS)} — search "gold price today", "silver close today", etc.
+
+Also search: "VIX close today", "DXY close today", "economic calendar tomorrow"
 
 Structure:
 
 1. DAILY SCOREBOARD
-   For each asset class, provide a table:
-   - Instrument | Open | High | Low | Close | Change %
-   Focus on the biggest movers in each class.
+   For each asset class, list:
+   - Instrument: Close price | Daily change | Change %
+   Highlight the biggest movers in each class.
 
 2. SESSION NARRATIVE
    - What was the dominant theme today?
    - Which asset class led? Which lagged?
    - Any regime shift signals?
 
-3. TRADE IDEA SCORECARD
-   - Review typical pre-market trade setups: which levels were hit?
-   - What worked and what didn't?
-   - Lessons or patterns to note
+3. FOREX WRAP
+   - DXY closing level and daily change
+   - Each pair: closing price, daily change %, session summary
 
-4. FOREX WRAP
-   - DXY close, major pair summaries
-   - Any pairs setting up for multi-day moves?
+4. CRYPTO WRAP
+   - BTC and ETH: closing price, 24h change %, daily candle analysis
+   - Funding rates, open interest changes if available
 
-5. CRYPTO WRAP
-   - BTC and ETH daily candle analysis
-   - Funding rates, open interest changes
-   - Notable on-chain data
-
-6. INDICES WRAP
-   - Close levels, breadth indicators
+5. INDICES WRAP
+   - Each index: closing level, daily change %
    - Sector performance ranking
 
-7. COMMODITIES & METALS WRAP
-   - Closing prices, inventory changes
+6. COMMODITIES & METALS WRAP
+   - Each: closing price, daily change %
    - Supply/demand developments
 
-8. OVERNIGHT RISK RADAR
+7. OVERNIGHT RISK RADAR
    - Events in the next 12 hours that could gap markets
-   - Asian session data releases
-   - Central bank speakers overnight
-   - Geopolitical watch items
+   - Asian session data releases, central bank speakers
 
-9. TOMORROW PREVIEW
+8. TOMORROW PREVIEW
    - Key events and expected levels for tomorrow
-   - Early trade ideas to research tonight"""
+   - 2-3 trade ideas for tomorrow with entry, SL, TP, R:R
+
+Do NOT say prices are unavailable. You MUST search and find them."""
 
     result = call_perplexity(prompt, MODEL_BRIEFING, "day")
     header = (
@@ -390,13 +412,20 @@ def weekend_deep_dive():
     """Weekly deep dive: regime assessment, scoring, swing ideas."""
     logger.info("Running WEEKEND deep dive…")
     pos_context = format_positions_for_prompt()
-    prompt = f"""Conduct a comprehensive weekly trading analysis across all asset classes.
+    prompt = f"""Search for THIS WEEK'S PRICE DATA for all instruments below and conduct a comprehensive weekly analysis.
 
 {pos_context}
 For each open position, provide a weekly outlook and whether the trade thesis is still valid for the coming week.
 
-Instruments tracked:
-{instrument_block()}
+You MUST search for weekly performance data for EACH of these:
+
+FOREX: {', '.join(FOREX)} — search "EUR/USD weekly performance", "USD/JPY this week", etc.
+CRYPTO: {', '.join(CRYPTO)} — search "Bitcoin price this week", "ETH weekly chart", etc.
+INDICES: {', '.join(INDICES)} — search "S&P 500 weekly performance", "DAX this week", etc.
+COMMODITIES: {', '.join(COMMODITIES)} — search "crude oil price this week", "WTI weekly", etc.
+METALS: {', '.join(METALS)} — search "gold price this week", "silver weekly", etc.
+
+Also search: "DXY this week", "VIX this week", "COT report latest", "economic calendar next week"
 
 Provide:
 
@@ -407,28 +436,25 @@ Provide:
 
 2. WEEKLY PERFORMANCE TABLE
    For each instrument:
-   - Weekly open, close, high, low, change %
+   - Weekly open, close, high, low, change % (ACTUAL numbers)
    - Relative strength ranking within each asset class
 
 3. FOREX WEEKLY
-   - DXY weekly candle analysis
-   - Major pair weekly closes and technical patterns
-   - COT (Commitment of Traders) positioning if available
+   - DXY: weekly close, change %, candle analysis
+   - Each pair: weekly close, change %, technical patterns
+   - COT positioning if available
 
 4. CRYPTO WEEKLY
-   - BTC and ETH weekly candle, dominance trend
-   - DeFi/NFT/L2 narrative shifts
-   - Institutional flow signals
+   - BTC and ETH: weekly close, change %, candle analysis
+   - Dominance trend, institutional flow signals
 
 5. INDICES WEEKLY
-   - Weekly performance ranking
+   - Each index: weekly close, change %
    - Breadth and volatility analysis
-   - Earnings season impact (if applicable)
 
 6. COMMODITIES & METALS WEEKLY
-   - Supply/demand balance shifts
-   - Seasonal patterns in play
-   - Inventory and production data
+   - Each: weekly close, change %
+   - Supply/demand balance shifts, inventory data
 
 7. CONSENSUS ERRORS
    - Where is the market consensus wrong?
@@ -436,7 +462,7 @@ Provide:
 
 8. SWING TRADE IDEAS (4-6 ideas, multi-day to multi-week hold)
    For EACH:
-   - Asset, direction, detailed entry logic and trigger
+   - Asset, direction, detailed entry logic with SPECIFIC price
    - Stop-loss with ATR-based reasoning
    - Two target levels (partial exit + full exit)
    - Position sizing suggestion (% of capital)
@@ -445,14 +471,15 @@ Provide:
 
 9. RISK MANAGEMENT REVIEW
    - Portfolio heat check: if all ideas are taken, total risk exposure
-   - Correlation between ideas — are you concentrated in one theme?
+   - Correlation between ideas
    - Suggested maximum simultaneous positions
 
 10. NEXT WEEK CALENDAR
     - Major economic releases with dates, times (UTC), and consensus
     - Central bank decisions or minutes
     - Earnings to watch
-    - Geopolitical events on the radar"""
+
+Do NOT say prices are unavailable. You MUST search and find them."""
 
     result = call_perplexity(prompt, MODEL_DEEP, "week")
     header = (
