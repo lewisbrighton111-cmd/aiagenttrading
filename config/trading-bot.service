@@ -1,0 +1,18 @@
+[Unit]
+Description=SNIPER Trading Intelligence Pipeline
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/trading-bot
+ExecStart=/opt/trading-bot/venv/bin/python /opt/trading-bot/daemon.py
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=60
+User=root
+Environment=PATH=/opt/trading-bot/venv/bin:/usr/bin
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
